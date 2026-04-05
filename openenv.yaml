@@ -1,0 +1,81 @@
+name: personal-finance-manager
+version: "1.0.0"
+description: >
+  An OpenEnv environment where an AI agent manages a monthly personal budget.
+  The agent categorizes transactions, approves or rejects discretionary expenses,
+  reallocates budget buckets, and directs money toward savings and debt reduction.
+  Objective: maximize savings rate while keeping essential expenses covered.
+
+author: OpenEnv Submission
+license: MIT
+tags: [finance, budget, real-world, planning, optimization]
+
+environment:
+  class: PersonalFinanceEnv
+  module: environment
+  observation_type: Observation
+  action_type: Action
+  reward_type: Reward
+
+tasks:
+  - id: 1
+    name: budget-easy
+    description: >
+      9 transactions (mix of labeled/unlabeled, essential/discretionary).
+      Categorize 4 transactions, approve/reject 5 pending expenses.
+    pass_threshold: 0.60
+    difficulty: easy
+
+  - id: 2
+    name: budget-medium
+    description: >
+      16 transactions with multiple categories near their limits.
+      Requires categorization, approve/reject decisions, AND budget reallocation.
+    pass_threshold: 0.55
+    difficulty: medium
+
+  - id: 3
+    name: budget-hard
+    description: >
+      20 transactions plus a mid-month $650 emergency car repair.
+      Agent must handle crisis, rebalance budget, and maintain positive savings rate.
+    pass_threshold: 0.50
+    difficulty: hard
+
+observation_space:
+  type: Observation
+  fields:
+    day: int
+    monthly_income: float
+    cash_balance: float
+    savings_balance: float
+    investment_balance: float
+    debt_balance: float
+    budget_buckets: "dict[str, BudgetBucket]"
+    pending_transactions: "list[Transaction]"
+    uncategorized_transactions: "list[Transaction]"
+    recent_transactions: "list[Transaction]"
+    savings_rate: float
+
+action_space:
+  type: Action
+  fields:
+    action_type: "categorize | approve | reject | allocate | invest | pay_debt"
+    transaction_id: "str | null"
+    category: "ExpenseCategory | null"
+    from_bucket: "str | null"
+    to_bucket: "str | null"
+    amount: "float | null"
+    rationale: str
+
+reward_space:
+  type: Reward
+  range: [-1.0, 1.0]
+
+setup:
+  python: ">=3.11"
+  dependencies: "pydantic>=2.0 openai>=1.0"
+  install: "pip install -r requirements.txt"
+  validate: "python graders.py"
+  inference: "python inference.py"
+  docker: "docker build -t finance-env . && docker run --env HF_TOKEN=$HF_TOKEN finance-env"
