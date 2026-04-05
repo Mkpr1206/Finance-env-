@@ -1,7 +1,7 @@
 [project]
 name = "personal-finance-env"
 version = "1.0.0"
-description = "OpenEnv Personal Finance Manager — budget, expenses, savings optimization"
+description = "OpenEnv Personal Finance Manager"
 requires-python = ">=3.11"
 dependencies = [
     "openenv-core>=0.2.0",
@@ -18,6 +18,3 @@ server = "server.app:app"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["server", "environment", "graders", "inference"]
