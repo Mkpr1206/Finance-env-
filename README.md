@@ -1,3 +1,11 @@
+---
+title: Personal Finance Manager
+emoji: ??
+colorFrom: green
+colorTo: blue
+sdk: docker
+pinned: false
+---
 # PersonalFinanceEnv
 
 > **OpenEnv RL Hackathon** · Real-world task simulation · Personal Budget Management
@@ -127,3 +135,4 @@ docker run --env HF_TOKEN=$HF_TOKEN \
 | `HF_TOKEN` | — | **Yes** |
 | `API_BASE_URL` | `https://api.openai.com/v1` | No |
 | `MODEL_NAME` | `gpt-4.1-mini` | No |
+
