@@ -1,18 +1,120 @@
 """
-server/app.py — PersonalFinanceEnv FastAPI server
-Uses openenv_core.env_server.create_app as required by the OpenEnv validator.
-Entry point: uvicorn server.app:app --host 0.0.0.0 --port 7860
+server/app.py — OpenEnv HTTP Server for PersonalFinanceEnv
+Exposes POST /reset, POST /step, GET /state for the evaluator.
 """
 
 import os
-from openenv_core.env_server import create_app
-from server.environment import PersonalFinanceEnv, FinanceAction, FinanceObservation
+import sys
+import json
+import threading
+import subprocess
 
-# Instantiate env — task_id can be overridden via env var
-task_id = int(os.getenv("TASK_ID", "1"))
-seed    = int(os.getenv("SEED", "42"))
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-env = PersonalFinanceEnv(task_id=task_id, seed=seed)
+# Add parent dir to path so we can import environment
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# create_app wires up /reset, /step, /state, /health automatically
-app = create_app(env, FinanceAction, FinanceObservation)
+from environment import PersonalFinanceEnv, Action, Observation
+
+app = FastAPI(title="PersonalFinanceEnv", version="1.0.0")
+
+# Global env instance
+_env: PersonalFinanceEnv | None = None
+
+
+# ── Request models ──────────────────────────────────────────────
+
+class ResetRequest(BaseModel):
+    task_id: int = 1
+    seed: int = 42
+
+
+class StepRequest(BaseModel):
+    action: dict
+
+
+# ── Routes ──────────────────────────────────────────────────────
+
+@app.get("/")
+def root():
+    return {"status": "running", "env": "PersonalFinanceEnv", "version": "1.0.0"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.post("/reset")
+def reset(req: ResetRequest = None):
+    global _env
+    task_id = req.task_id if req else 1
+    seed = req.seed if req else 42
+    _env = PersonalFinanceEnv(task_id=task_id, seed=seed)
+    obs = _env.reset()
+    return JSONResponse(content=_obs_to_dict(obs))
+
+
+@app.post("/step")
+def step(req: StepRequest):
+    global _env
+    if _env is None:
+        raise HTTPException(status_code=400, detail="Call /reset first")
+    try:
+        action = Action(**req.action)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Invalid action: {e}")
+    obs, reward, done, info = _env.step(action)
+    return JSONResponse(content={
+        "observation": _obs_to_dict(obs),
+        "reward": reward.value,
+        "done": done,
+        "info": info,
+    })
+
+
+@app.get("/state")
+def state():
+    global _env
+    if _env is None:
+        raise HTTPException(status_code=400, detail="Call /reset first")
+    return JSONResponse(content=_env.state())
+
+
+# ── Helper ──────────────────────────────────────────────────────
+
+def _obs_to_dict(obs: Observation) -> dict:
+    d = obs.model_dump()
+    d["budget_buckets"] = {
+        k: {
+            "name": v.name,
+            "allocated": v.allocated,
+            "spent": v.spent,
+            "remaining": v.remaining,
+            "utilization": v.utilization,
+        }
+        for k, v in obs.budget_buckets.items()
+    }
+    return d
+
+
+# ── Run inference.py in background on startup ───────────────────
+
+def _run_inference():
+    try:
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        subprocess.run(
+            [sys.executable, os.path.join(root_dir, "inference.py")],
+            env=os.environ.copy(),
+            timeout=1100,
+        )
+    except Exception as e:
+        print(f"[inference background] {e}", flush=True)
+
+
+@app.on_event("startup")
+def startup_event():
+    t = threading.Thread(target=_run_inference, daemon=True)
+    t.start()
