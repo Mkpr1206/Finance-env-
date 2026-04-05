@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "personal-finance-env"
+version = "1.0.0"
+description = "OpenEnv environment for personal finance budget management"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "openai>=1.0",
+    "pyyaml>=6.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
