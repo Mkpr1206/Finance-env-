@@ -1,5 +1,11 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+import sys
+import os
+
+# Fix import path
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from environment import PersonalFinanceEnv
 
 app = FastAPI()
