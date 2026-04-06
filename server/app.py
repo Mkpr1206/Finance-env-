@@ -1,7 +1,35 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
+from environment import PersonalFinanceEnv
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"message": "Finance Env running"}
+env = PersonalFinanceEnv()
+
+class Action(BaseModel):
+    action_type: str
+    amount: float | None = None
+    transaction_id: str | None = None
+    category: str | None = None
+
+
+@app.post("/reset")
+def reset():
+    obs = env.reset()
+    return {"observation": obs}
+
+
+@app.post("/step")
+def step(action: Action):
+    obs, reward, done, info = env.step(action.dict())
+    return {
+        "observation": obs,
+        "reward": reward,
+        "done": done,
+        "info": info
+    }
+
+
+@app.get("/state")
+def state():
+    return env.state()
