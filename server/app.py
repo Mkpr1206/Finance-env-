@@ -27,18 +27,47 @@ def reset():
 
 @app.post("/step")
 def step(action: Action):
-    obs, reward, done, info = env.step(action.dict())
-    return {
-        "observation": obs,
-        "reward": reward,
-        "done": done,
-        "info": info
-    }
+    try:
+        action_dict = action.dict()
+
+        # Provide defaults to avoid crashes
+        if action_dict.get("amount") is None:
+            action_dict["amount"] = 0.0
+
+        obs, reward, done, info = env.step(action_dict)
+
+        return {
+            "observation": obs,
+            "reward": reward,
+            "done": done,
+            "info": info
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
-@app.get("/state")
-def state():
-    return env.state()
+@app.post("/step")
+def step(action: Action):
+    try:
+        action_dict = action.dict()
+
+        # Provide defaults to avoid crashes
+        if action_dict.get("amount") is None:
+            action_dict["amount"] = 0.0
+
+        obs, reward, done, info = env.step(action_dict)
+
+        return {
+            "observation": obs,
+            "reward": reward,
+            "done": done,
+            "info": info
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.get("/")
 def home():
