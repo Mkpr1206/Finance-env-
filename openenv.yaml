@@ -1,5 +1,9 @@
 name: personal-finance-manager
 version: "1.0.0"
+
+entrypoint: server.app:main
+
+
 description: >
   An OpenEnv environment where an AI agent manages a monthly personal budget.
   The agent categorizes transactions, approves or rejects discretionary expenses,
