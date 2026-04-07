@@ -1,6 +1,7 @@
 """
 graders.py — Deterministic graders for all 3 PersonalFinanceEnv tasks.
-Scores range 0.0–1.0. Pass thresholds: Task 1 ≥ 0.60, Task 2 ≥ 0.55, Task 3 ≥ 0.50
+Scores are strictly in (0.001, 0.999) — never exactly 0.0 or 1.0.
+Pass thresholds: Task 1 >= 0.60, Task 2 >= 0.55, Task 3 >= 0.50
 """
 
 from __future__ import annotations
@@ -18,11 +19,7 @@ def grade_task(task_id: int, actions: list[dict], seed: int = 42) -> dict:
         actions:  list of dicts matching Action schema
         seed:     RNG seed (keep at 42 for reproducibility)
 
-    Returns dict with keys:
-        task_id, score, pass, pass_threshold,
-        savings_rate, debt_remaining,
-        avg_step_reward, completion_rate,
-        steps, errors, rewards_per_step
+    Returns dict with score strictly in (0.001, 0.999) — never 0.0 or 1.0.
     """
     env = PersonalFinanceEnv(task_id=task_id, seed=seed)
     obs = env.reset()
@@ -50,36 +47,38 @@ def grade_task(task_id: int, actions: list[dict], seed: int = 42) -> dict:
     final_obs = env._obs()
 
     # ── Scoring (4 components) ───────────────────────────────
-    avg_reward      = sum(rewards) / len(rewards) if rewards else 0.0
-    quality_score   = max(0.0, min(1.0, (avg_reward + 0.5) / 1.5))
-    savings_score   = min(1.0, state["savings_rate"] / 0.20)   # 20% = perfect
-    remaining       = len(final_obs.pending_transactions) + len(final_obs.uncategorized_transactions)
-    completion      = 1.0 - (remaining / total_items) if total_items > 0 else 1.0
-    debt_progress   = min(1.0, (PersonalFinanceEnv.STARTING_DEBT - state["debt"]) / PersonalFinanceEnv.STARTING_DEBT)
+    avg_reward    = sum(rewards) / len(rewards) if rewards else 0.0
+    quality_score = max(0.0, min(1.0, (avg_reward + 0.5) / 1.5))
+    savings_score = min(1.0, state["savings_rate"] / 0.20)
+    remaining     = len(final_obs.pending_transactions) + len(final_obs.uncategorized_transactions)
+    completion    = 1.0 - (remaining / total_items) if total_items > 0 else 1.0
+    debt_progress = min(1.0, (PersonalFinanceEnv.STARTING_DEBT - state["debt"]) / PersonalFinanceEnv.STARTING_DEBT)
 
-    score = (
+    raw_score = (
         quality_score * 0.40 +
         savings_score * 0.30 +
         completion    * 0.20 +
         debt_progress * 0.10
     )
 
+    score = max(0.001, min(0.999, raw_score))
+    score = float(f"{score:.3f}")  # format AFTER clamping safely
     return {
-        "task_id":         task_id,
-        "score":           round(score, 3),
-        "pass":            score >= PASS_THRESHOLDS[task_id],
-        "pass_threshold":  PASS_THRESHOLDS[task_id],
-        "savings_rate":    round(state["savings_rate"], 4),
-        "debt_remaining":  round(state["debt"], 2),
-        "avg_step_reward": round(avg_reward, 3),
-        "completion_rate": round(completion, 3),
-        "steps":           len(rewards),
-        "errors":          errors,
+        "task_id":          task_id,
+        "score":            score,
+        "pass":             score >= PASS_THRESHOLDS[task_id],
+        "pass_threshold":   PASS_THRESHOLDS[task_id],
+        "savings_rate":     round(state["savings_rate"], 4),
+        "debt_remaining":   round(state["debt"], 2),
+        "avg_step_reward":  round(avg_reward, 3),
+        "completion_rate":  round(completion, 3),
+        "steps":            len(rewards),
+        "errors":           errors,
         "rewards_per_step": [round(r, 3) for r in rewards],
     }
 
 
-# ── Self-test ─────────────────────────────────────────────────────────────────
+# ── Self-test ──────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print("=" * 58)
@@ -105,7 +104,7 @@ if __name__ == "__main__":
              rationale="Investing surplus cash into long-term investments"),
     ]
     r1 = grade_task(1, t1)
-    print(f"\nTask 1 (Easy)   {'✓ PASS' if r1['pass'] else '✗ FAIL'}  "
+    print(f"\nTask 1 (Easy)   {'PASS' if r1['pass'] else 'FAIL'}  "
           f"score={r1['score']:.3f}  threshold={r1['pass_threshold']}  "
           f"savings={r1['savings_rate']:.1%}")
 
@@ -128,7 +127,7 @@ if __name__ == "__main__":
              rationale="Extra debt payment to reduce interest charges"),
     ]
     r2 = grade_task(2, t2)
-    print(f"Task 2 (Medium) {'✓ PASS' if r2['pass'] else '✗ FAIL'}  "
+    print(f"Task 2 (Medium) {'PASS' if r2['pass'] else 'FAIL'}  "
           f"score={r2['score']:.3f}  threshold={r2['pass_threshold']}  "
           f"savings={r2['savings_rate']:.1%}")
 
@@ -143,10 +142,15 @@ if __name__ == "__main__":
              rationale="Small extra payment even during emergency month"),
     ]
     r3 = grade_task(3, t3)
-    print(f"Task 3 (Hard)   {'✓ PASS' if r3['pass'] else '✗ FAIL'}  "
+    print(f"Task 3 (Hard)   {'PASS' if r3['pass'] else 'FAIL'}  "
           f"score={r3['score']:.3f}  threshold={r3['pass_threshold']}  "
           f"savings={r3['savings_rate']:.1%}")
 
     print(f"\nRewards (Task 1): {r1['rewards_per_step']}")
     print(f"Errors:           {r1['errors'] or 'none'}")
+
+    # Verify scores are strictly in (0, 1)
+    for r in [r1, r2, r3]:
+        assert 0.0 < r["score"] < 1.0, f"Score out of range: {r['score']}"
+    print("\nAll scores strictly in (0, 1) - validator will accept these.")
     print("=" * 58)
