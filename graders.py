@@ -46,13 +46,37 @@ def grade_task(task_id: int, actions: list[dict], seed: int = 42) -> dict:
     state = env.state()
     final_obs = env._obs()
 
+    
+
     # ── Scoring (4 components) ───────────────────────────────
-    avg_reward    = sum(rewards) / len(rewards) if rewards else 0.0
-    quality_score = max(0.0, min(1.0, (avg_reward + 0.5) / 1.5))
-    savings_score = min(1.0, state["savings_rate"] / 0.20)
-    remaining     = len(final_obs.pending_transactions) + len(final_obs.uncategorized_transactions)
-    completion    = 1.0 - (remaining / total_items) if total_items > 0 else 1.0
-    debt_progress = min(1.0, (PersonalFinanceEnv.STARTING_DEBT - state["debt"]) / PersonalFinanceEnv.STARTING_DEBT)
+
+avg_reward = sum(rewards) / len(rewards) if rewards else 0.0
+
+remaining = len(final_obs.pending_transactions) + len(final_obs.uncategorized_transactions)
+
+def safe(x):
+    return max(0.001, min(0.999, x))
+
+quality_score = safe((avg_reward + 0.5) / 1.5)
+savings_score = safe(state["savings_rate"] / 0.20)
+
+completion = safe(1.0 - (remaining / total_items)) if total_items > 0 else 0.999
+
+debt_progress = safe(
+    (PersonalFinanceEnv.STARTING_DEBT - state["debt"]) /
+    PersonalFinanceEnv.STARTING_DEBT
+)
+
+raw_score = (
+    quality_score * 0.40 +
+    savings_score * 0.30 +
+    completion    * 0.20 +
+    debt_progress * 0.10
+)
+
+# FINAL clamp (VERY IMPORTANT)
+score = max(0.001, min(0.999, raw_score))
+score = float(f"{score:.3f}")
 
     raw_score = (
         quality_score * 0.40 +
