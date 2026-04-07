@@ -8,7 +8,7 @@ from environment import PersonalFinanceEnv, Action
 
 PASS_THRESHOLDS = {1: 0.60, 2: 0.55, 3: 0.50}
 
-
+print("🔥 NEW GRADER LOADED 🔥")
 def grade_task(task_id: int, actions: list[dict], seed: int = 42) -> dict:
     env = PersonalFinanceEnv(task_id=task_id, seed=seed)
     obs = env.reset()
