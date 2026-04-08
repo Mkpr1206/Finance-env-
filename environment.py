@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Any
 # 🔥 ONLY SHOWING MODIFIED PARTS — KEEP REST SAME
 
 class PersonalFinanceEnv:
@@ -7,7 +9,7 @@ class PersonalFinanceEnv:
         return max(0.01, min(0.99, float(value)))
 
     # ✅ FIXED APPLY FUNCTION (YOUR BIGGEST BUG)
-    def _apply(self, action: Action) -> Reward:
+    def _apply(self, action: Any) -> Any:
         handler = {
             ActionType.CATEGORIZE: self._categorize,
             ActionType.APPROVE:    self._approve,
