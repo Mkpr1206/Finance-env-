@@ -83,3 +83,7 @@ setup:
   validate: "python graders.py"
   inference: "python inference.py"
   docker: "docker build -t finance-env . && docker run --env HF_TOKEN=$HF_TOKEN finance-env"
+
+grader:
+  path: graders.py
+  entrypoint: grade_task
