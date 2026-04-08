@@ -12,19 +12,42 @@ app = FastAPI()
 
 env = PersonalFinanceEnv()
 
+
+# ─────────────────────────────────────────────
+# Request model
+# ─────────────────────────────────────────────
 class Action(BaseModel):
     action_type: str
     amount: float | None = None
     transaction_id: str | None = None
     category: str | None = None
+    from_bucket: str | None = None
+    to_bucket: str | None = None
 
 
+# ─────────────────────────────────────────────
+# ROOT (required)
+# ─────────────────────────────────────────────
+@app.get("/")
+def home():
+    return {
+        "status": "Server running",
+        "endpoints": ["/reset", "/step", "/state"]
+    }
+
+
+# ─────────────────────────────────────────────
+# RESET (CRITICAL)
+# ─────────────────────────────────────────────
 @app.post("/reset")
 def reset():
     obs = env.reset()
     return {"observation": obs}
 
 
+# ─────────────────────────────────────────────
+# STEP (CRITICAL)
+# ─────────────────────────────────────────────
 @app.post("/step")
 def step(action: Action):
     try:
@@ -37,7 +60,7 @@ def step(action: Action):
 
         return {
             "observation": obs,
-            "reward": reward,
+            "reward": float(max(0.001, min(0.999, reward))),  # 🔥 SAFE CLAMP
             "done": done,
             "info": info
         }
@@ -46,20 +69,21 @@ def step(action: Action):
         return {"error": str(e)}
 
 
+# ─────────────────────────────────────────────
+# STATE (REQUIRED)
+# ─────────────────────────────────────────────
 @app.get("/state")
 def state():
     return env.state()
 
 
-@app.get("/")
-def home():
-    return {"status": "Server running", "endpoints": ["/reset", "/step", "/state"]}
-
-
+# ─────────────────────────────────────────────
+# ENTRYPOINT (CRITICAL FOR OPENENV)
+# ─────────────────────────────────────────────
 import uvicorn
 
 def main():
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
 
 
 if __name__ == "__main__":
