@@ -1,5 +1,6 @@
 """
-server/finance_environment.py — PersonalFinanceEnvironment subclassing openenv_core.Environment
+server/finance_environment.py — PersonalFinanceEnvironment
+Subclasses openenv_core.Environment. All reward values strictly in (0.001, 0.999).
 """
 from __future__ import annotations
 import sys, os
@@ -18,52 +19,43 @@ try:
 except ImportError:
     from models import FinanceAction, FinanceObservation
 
-# Import the core finance engine (plain Python, no openenv dependency)
 from environment import PersonalFinanceEnv, Action as CoreAction, ActionType, ExpenseCategory
 
 
+def _clamp(v: float) -> float:
+    """Clamp to strictly (0.001, 0.999) — never 0.0 or 1.0."""
+    return round(max(0.001, min(0.999, float(v))), 4)
+
+
 class PersonalFinanceEnvironment(Environment):
-    """
-    OpenEnv-compliant Personal Finance Manager.
-    Wraps PersonalFinanceEnv for the openenv_core server framework.
-    """
 
     def __init__(self):
         super().__init__()
         self._env = PersonalFinanceEnv(task_id=1, seed=42)
-        self._task_id = 1
         self._initialized = False
 
     def reset(self, task_id: int = 1, seed: int = 42) -> FinanceObservation:
-        self._task_id = task_id
         self._env = PersonalFinanceEnv(task_id=task_id, seed=seed)
         obs = self._env.reset()
         self._initialized = True
-        return self._to_obs(obs, reward=0.0, done=False, msg="Episode started")
+        return self._to_obs(obs, reward=0.5, done=False, msg="Episode started")
 
     def step(self, action: FinanceAction) -> FinanceObservation:
         if not self._initialized:
             self.reset()
-
         try:
             core_action = self._to_core_action(action)
             obs, reward, done, info = self._env.step(core_action)
-            # Clamp reward strictly between -1 and 1 (already is, but be safe)
-            reward_val = float(max(-0.999, min(0.999, reward.value)))
-            return self._to_obs(obs, reward=reward_val, done=done,
-                                msg=reward.reason)
+            return self._to_obs(obs, reward=_clamp(reward.value), done=done, msg=reward.reason)
         except Exception as e:
             obs = self._env._obs()
-            return self._to_obs(obs, reward=0.001, done=False,
-                                msg=f"Action error: {e}")
+            return self._to_obs(obs, reward=0.1, done=False, msg=f"error: {e}")
 
     @property
     def state(self):
         if not self._initialized:
             return {"status": "not_started"}
         return self._env.state()
-
-    # ── helpers ──────────────────────────────────────────────
 
     def _to_core_action(self, a: FinanceAction) -> CoreAction:
         return CoreAction(
@@ -87,7 +79,7 @@ class PersonalFinanceEnvironment(Environment):
             savings_rate=obs.savings_rate,
             pending_count=len(obs.pending_transactions),
             uncategorized_count=len(obs.uncategorized_transactions),
-            reward=reward,
+            reward=_clamp(reward),
             done=done,
             message=msg,
         )
