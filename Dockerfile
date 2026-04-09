@@ -7,6 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Smoke test at build time
+RUN python -c "from environment import PersonalFinanceEnv; e=PersonalFinanceEnv(); e.reset(); print('OK')"
+
 EXPOSE 7860
 
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]
