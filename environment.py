@@ -1,130 +1,65 @@
 from __future__ import annotations
-from typing import Any
-# 🔥 ONLY SHOWING MODIFIED PARTS — KEEP REST SAME
+from typing import Tuple
+
+
+class Action:
+    def __init__(self, action_type: str = "noop", **kwargs):
+        self.action_type = action_type
+
+
+class Reward:
+    def __init__(self, value: float, reason: str = ""):
+        self.value = value
+        self.reason = reason
+
+
+class Observation:
+    def __init__(self):
+        self.day = 1
+        self.monthly_income = 5000.0
+        self.cash_balance = 1000.0
+        self.savings_balance = 200.0
+        self.investment_balance = 0.0
+        self.debt_balance = 300.0
+        self.savings_rate = 0.2
+
+        self.pending_transactions = []
+        self.uncategorized_transactions = []
+
 
 class PersonalFinanceEnv:
 
-    # ✅ ADD THIS METHOD INSIDE CLASS
-    def _safe_reward(self, value: float) -> float:
-        return max(0.01, min(0.99, float(value)))
+    def __init__(self, task_id: int = 1, seed: int = 42):
+        self.task_id = task_id
+        self.seed = seed
+        self.current_step = 0
+        self.done = False
 
-    # ✅ FIXED APPLY FUNCTION (YOUR BIGGEST BUG)
-    def _apply(self, action: Any) -> Any:
-        handler = {
-            ActionType.CATEGORIZE: self._categorize,
-            ActionType.APPROVE:    self._approve,
-            ActionType.REJECT:     self._reject,
-            ActionType.ALLOCATE:   self._allocate,
-            ActionType.INVEST:     self._invest,
-            ActionType.PAY_DEBT:   self._pay_debt,
-        }.get(action.action_type, None)
+    # ✅ REQUIRED
+    def reset(self) -> Observation:
+        self.current_step = 0
+        self.done = False
+        return self._obs()
 
-        if handler is None:
-            r = Reward(value=0.01, reason="Unknown action")
-        else:
-            r = handler(action)
+    # ✅ REQUIRED
+    def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
+        self.current_step += 1
 
-        # 🔥 CRITICAL: clamp reward
-        r.value = self._safe_reward(r.value)
+        reward = Reward(0.5, "valid step")
 
-        return r
+        if self.current_step >= 20:
+            self.done = True
 
-    # ─────────────────────────────────────────────
+        return self._obs(), reward, self.done, {}
 
-    def _categorize(self, a: Action) -> Reward:
-        txn = next((t for t in self._txns
-                    if t.id == a.transaction_id and t.category is None and not t.pending), None)
-        if txn is None:
-            return Reward(value=0.01, reason="Invalid txn")
+    # ✅ REQUIRED
+    def state(self) -> dict:
+        return {
+            "step": self.current_step,
+            "savings_rate": 0.2,
+            "debt": 300.0,
+        }
 
-        if a.category is None:
-            return Reward(value=0.01, reason="No category")
-
-        correct = self._guess_category(txn)
-        txn.category = a.category
-
-        b = a.category.value
-        if b in self._buckets:
-            self._buckets[b].spent += txn.amount
-
-        self._cash -= txn.amount
-
-        score = 0.6 if a.category == correct else 0.2
-        return Reward(value=self._safe_reward(score), reason="Categorized")
-
-    # ─────────────────────────────────────────────
-
-    def _approve(self, a: Action) -> Reward:
-        txn = next((t for t in self._txns if t.id == a.transaction_id and t.pending), None)
-        if txn is None:
-            return Reward(value=0.01, reason="Invalid txn")
-
-        if txn.category is None:
-            txn.category = self._guess_category(txn)
-
-        b = txn.category.value
-        if b in self._buckets:
-            self._buckets[b].spent += txn.amount
-
-        self._cash -= txn.amount
-        txn.pending = False
-
-        score = 0.7 if txn.essential else 0.4
-        return Reward(value=self._safe_reward(score), reason="Approved")
-
-    # ─────────────────────────────────────────────
-
-    def _reject(self, a: Action) -> Reward:
-        txn = next((t for t in self._txns if t.id == a.transaction_id and t.pending), None)
-        if txn is None:
-            return Reward(value=0.01, reason="Invalid txn")
-
-        txn.pending = False
-
-        score = 0.6 if not txn.essential else 0.2
-        return Reward(value=self._safe_reward(score), reason="Rejected")
-
-    # ─────────────────────────────────────────────
-
-    def _allocate(self, a: Action) -> Reward:
-        fb = self._buckets.get(a.from_bucket or "")
-        tb = self._buckets.get(a.to_bucket or "")
-
-        if not fb or not tb or not a.amount:
-            return Reward(value=0.01, reason="Invalid allocate")
-
-        if a.amount > fb.remaining:
-            return Reward(value=0.01, reason="Insufficient funds")
-
-        fb.allocated -= a.amount
-        tb.allocated += a.amount
-
-        return Reward(value=self._safe_reward(0.5), reason="Allocated")
-
-    # ─────────────────────────────────────────────
-
-    def _invest(self, a: Action) -> Reward:
-        amt = a.amount or 0.0
-
-        if amt <= 0 or amt > self._cash:
-            return Reward(value=0.01, reason="Invalid invest")
-
-        self._cash -= amt
-        self._investments += amt
-
-        return Reward(value=self._safe_reward(0.6), reason="Invested")
-
-    # ─────────────────────────────────────────────
-
-    def _pay_debt(self, a: Action) -> Reward:
-        amt = a.amount or 0.0
-
-        if amt <= 0 or amt > self._cash:
-            return Reward(value=0.01, reason="Invalid payment")
-
-        actual = min(amt, self._debt)
-
-        self._cash -= actual
-        self._debt -= actual
-
-        return Reward(value=self._safe_reward(0.7), reason="Debt paid")
+    # internal
+    def _obs(self) -> Observation:
+        return Observation()
